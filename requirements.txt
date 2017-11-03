@@ -1,0 +1,4 @@
+gensim
+keras
+mlxtend
+numpy
