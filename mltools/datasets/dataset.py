@@ -3,36 +3,28 @@ from collections import Counter
 from mlxtend.preprocessing import one_hot
 import numpy as np
 
-# VOCAB_SIZE = 20000
-# VOCAB_TAGS = 10
-# MAX_SEQ_LENGTH = 30
-
 # function to get vocab, maxvocab
 # takes sents : list (tokenized lists of sentences)
 # takes maxvocab : int (maximum vocab size incl. UNK, PAD
 # takes stoplist : list (words to ignore)
 # returns vocab_dict (word to index), inv_vocab_dict (index to word)
-def get_vocab(sents, maxvocab=25000, stoplist=[], verbose=False):
-
+def get_vocab(sent_toks, maxvocab=10000, min_count=1, stoplist=[], unk='UNK', pad='PAD', verbose=False):
     # get vocab list
-    vocab = []
-    for sent in sents:
-        for word in sent:
-            vocab.append(word)
-
-    counts = Counter(vocab) # get counts of each word
-    vocab_set = list(set(vocab)) # get unique vocab list
-    sorted_vocab = sorted(vocab_set, key=lambda x: counts[x], reverse=True) # sort by counts
-    sorted_vocab = [i for i in sorted_vocab if i not in stoplist]
+    vocab = [word for sent in sent_toks for word in sent]
+    sorted_vocab = sorted(Counter(vocab).most_common(), key=lambda x: x[1], reverse=True)
+    sorted_vocab = [i for i in sorted_vocab if i[0] not in stoplist and i[0] != unk]
     if verbose:
-        print("\ntotal vocab size:", len(sorted_vocab), '\n')
-    sorted_vocab = sorted_vocab[:maxvocab-2]
+        print("total vocab:", len(sorted_vocab))
+    sorted_vocab = [i for i in sorted_vocab if i[1] >= min_count]
     if verbose:
-        print("\ntrunc vocab size:", len(sorted_vocab), '\n')
-    vocab_dict = {k: v+1 for v, k in enumerate(sorted_vocab)}
-    vocab_dict['UNK'] = maxvocab-1
-    vocab_dict['PAD'] = 0
+        print("vocab over min_count:", len(sorted_vocab))
+    # reserve for PAD and UNK
+    sorted_vocab = [i[0] for i in sorted_vocab[:maxvocab - 2]]
+    vocab_dict = {k: v + 1 for v, k in enumerate(sorted_vocab)}
+    vocab_dict[unk] = len(sorted_vocab) + 1
+    vocab_dict[pad] = 0
     inv_vocab_dict = {v: k for k, v in vocab_dict.items()}
+
     return vocab_dict, inv_vocab_dict
 
 
@@ -40,21 +32,20 @@ def get_vocab(sents, maxvocab=25000, stoplist=[], verbose=False):
 # takes list : sents (tokenized sentences)
 # takes dict : vocab (word to idx mapping)
 # returns list of lists of indexed sentences
-def index_sents(sents, vocab_dict, verbose=False):
-    if verbose:
-        print("starting vectorize_sents()...")
+def index_sents(sent_tokens, vocab_dict, reverse=False, unk_name='UNK', verbose=False):
     vectors = []
-    # iterate thru sents
-    for sent in sents:
+    for sent in sent_tokens:
         sent_vect = []
+        if reverse:
+            sent = sent[::-1]
         for word in sent:
             if word in vocab_dict.keys():
-                idx = vocab_dict[word]
-                sent_vect.append(idx)
-            else: # out of max_vocab range or OOV
-                sent_vect.append(vocab_dict['UNK'])
-        vectors.append(sent_vect)
-    return(vectors)
+                sent_vect.append(vocab_dict[word])
+            else:  # out of max_vocab range or OOV
+                sent_vect.append(vocab_dict[unk_name])
+        vectors.append(np.asarray(sent_vect))
+    vectors = np.asarray(vectors)
+    return vectors
 
 
 # one-hot vectorizes a list of indexed vectors
@@ -97,25 +88,3 @@ def dataGenerator(X, y, vocabsize, batch_size, epochsize):
         else:
             i += batch_size
 
-
-# def dataonehotGenerator(batch_size,
-#                   input_filepath='savedata/',
-#                   xfile='X_train.npy',
-#                   yfile='y_train_lex.npy',
-#                   vocabsize=VOCAB_SIZE,
-#                   posvocabsize=VOCAB_TAGS,
-#                   epochsize=300000):
-#
-#     i = 0
-#     X = np.load(input_filepath + xfile)
-#     y = np.load(input_filepath + yfile)
-#
-#     while True:
-#         # add in data reading/augmenting code here
-#         X_batch = onehot_vectorize(X[i:i + batch_size], vocabsize)
-#         y_batch = onehot_vectorize(y[i:i + batch_size], posvocabsize)
-#         yield (X_batch, y_batch)
-#         if i + batch_size >= epochsize:
-#             i = 0
-#         else:
-#             i += batch_size
