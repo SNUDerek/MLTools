@@ -7,8 +7,7 @@ module for custom functions used in keras and ML projects
 use the Tokenizer and Indexer in sequence for automatic indexing:
 
 ```
-from mltools import Tokenizer, Indexer
-from sklearn.pipeline import pipeline
+from mltools.preprocessing import Tokenizer, Indexer, Pipeline
 
 tokenizer = Tokenizer(max_vocab=100, min_count=1, lower=True, regex=True)
 indicizer = Indexer(max_len=10, pad='post', truncate='post',
