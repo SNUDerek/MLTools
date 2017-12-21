@@ -25,7 +25,7 @@ vects = pipeline.transform(text[:split_idx])
 
 this pipeline can be pickled with `sklearn.externals.joblib` `dump()` and `load()`
 
-## mltools.datasets
+## mltools.preprocessing
 
 functions for getting the (truncated) vocabulary
 

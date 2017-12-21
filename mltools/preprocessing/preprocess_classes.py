@@ -5,6 +5,130 @@ from keras.preprocessing.sequence import pad_sequences
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
+class LabelIndexer:
+    """
+    Custom LabelEncoder-alike to transform text labels to indices
+
+    Parameters
+    ----------
+    do_unk : bool
+        Add an UNK value
+    pad : str
+        string value of PAD
+    unk : str
+        string value of UNK
+    zero_pad : bool
+        Add a PAD value at index 0
+
+    Attributes
+    ----------
+    tag2idx : dict
+        Mapping of string labels to idx
+    idx2tag : dict
+        Mapping of idx to string labels
+    """
+
+    def __init__(self, zero_pad=False, pad='PAD', do_unk=False, unk='_UNK_'):
+        self.zero_pad = zero_pad
+        self.pad = pad
+        self.do_unk = do_unk
+        self.unk = unk
+        self.classes_ = None
+        self.tag2idx = {}
+        self.idx2tag = {}
+
+    def fit(self, tokens):
+        """create mappings from data"""
+
+        if not hasattr(tokens, '__iter__'):
+            raise TypeError("can't fit LabelIndexer to non-iterable!")
+        if type(tokens) == str:
+            raise TypeError("can't fit LabelIndexer to string!")
+
+        # flatten list of lists - DUMB CHECK
+        if hasattr(tokens[0], '__iter__') and type(tokens[0]) != str:
+            classes = list(set([t for sublst in tokens for t in sublst]))
+        else:
+            classes = list(set(list(tokens)))
+
+        # ignore UNK and PAD labels
+        if self.zero_pad:
+            classes = [c for c in classes if c != self.pad]
+            classes.insert(0, self.pad)
+        if self.do_unk:
+            classes = [c for c in classes if c != self.unk]
+            classes.append(self.unk)
+
+        self.classes_ = classes
+        self.tag2idx = {k: v for v, k in enumerate(self.classes_)}
+
+        # reverse
+        self.idx2tag = dict([[v, k] for k, v in self.tag2idx.items()])
+
+        return self
+
+    def transform(self, tokens):
+
+        if type(tokens) == str:
+            if tokens in self.tag2idx.keys():
+                return self.tag2idx[tokens]
+            elif self.do_unk:
+                return self.tag2idx[self.unk]
+            else:
+                raise ValueError("index not in class set!")
+
+        # recursively process list of lists
+        elif hasattr(tokens[0], '__iter__') and type(tokens[0]) != str:
+            result = []
+            for sublist in tokens:
+                result.append(self.transform(sublist))
+            return result
+
+        else:
+            result = []
+            for t in tokens:
+                if t in self.tag2idx.keys():
+                    result.append(self.tag2idx[t])
+                elif self.do_unk:
+                    result.append(self.tag2idx[self.unk])
+                else:
+                    raise ValueError("index {} not in class set!".format(t))
+            return result
+
+    def fit_transform(self, tokens):
+
+        self.fit(tokens)
+        indices = self.transform(tokens)
+        return indices
+
+    def inverse_transform(self, indices):
+
+        if type(indices) in (int, float, np.int, np.int32, np.int64):
+            if indices in self.idx2tag.keys():
+                return self.idx2tag[indices]
+            elif self.do_unk:
+                return self.unk
+            else:
+                raise ValueError("index not in class set!")
+
+        # recursively process list of lists
+        elif hasattr(indices[0], '__iter__') and type(indices[0]) != str:
+            result = []
+            for sublist in indices:
+                result.append(self.inverse_transform(sublist))
+            return result
+
+        else:
+            result = []
+            for t in indices:
+                if t in self.idx2tag.keys():
+                    result.append(self.idx2tag[t])
+                elif self.do_unk:
+                    result.append(self.unk)
+                else:
+                    raise ValueError("index not in class set!")
+            return result
+
 class Tokenizer(BaseEstimator, TransformerMixin):
     """
     Space-tokenize a list of (English) sentences.
