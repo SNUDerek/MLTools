@@ -27,6 +27,10 @@ this pipeline can be pickled with `sklearn.externals.joblib` `dump()` and `load(
 
 ## mltools.preprocessing
 
-functions for getting the (truncated) vocabulary
+functions for getting (truncated) vocabulary, integer-indexing sequences for keras
 
 decode_sequence, get_vocab, index_sents, onehot_vectorize, dataGenerator
+
+## mltools.embeddings
+
+functions for training `gensim.word2vec` models
