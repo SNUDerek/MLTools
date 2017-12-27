@@ -4,7 +4,6 @@ from collections import Counter
 from keras.preprocessing.sequence import pad_sequences
 from sklearn.base import BaseEstimator, TransformerMixin
 
-
 class LabelIndexer:
     """
     Custom LabelEncoder-alike to transform text labels to indices

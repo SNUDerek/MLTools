@@ -1,2 +1,4 @@
-from .preprocessing import preprocessing, preprocess_classes
-from .embeddings import gensimscripts
+__all__ = ['embeddings', 'preprocessing', 'similarity']
+import mltools.embeddings
+import mltools.preprocessing
+import mltools.similarity
