@@ -3,3 +3,4 @@ keras
 mlxtend
 numpy
 sklearn
+scipy

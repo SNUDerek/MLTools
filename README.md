@@ -2,7 +2,15 @@
 
 module for custom functions used in keras and ML projects
 
-## picklable class-based tokenization and indexing
+## installation
+
+use `pip install .` from root dir
+
+use `pip install -e .` for symlink (updates immediately accessible)
+
+## tools:
+
+### picklable class-based tokenization and indexing
 
 use the Tokenizer and Indexer in sequence for automatic indexing:
 
@@ -25,12 +33,16 @@ vects = pipeline.transform(text[:split_idx])
 
 this pipeline can be pickled with `sklearn.externals.joblib` `dump()` and `load()`
 
-## mltools.preprocessing
+### mltools.preprocessing
 
 functions for getting (truncated) vocabulary, integer-indexing sequences for keras
 
 decode_sequence, get_vocab, index_sents, onehot_vectorize, dataGenerator
 
-## mltools.embeddings
+### mltools.embeddings
 
 functions for training `gensim.word2vec` models
+
+### mltools.similarity
+
+class for using cosine similarity of sentence vectors for retrieval-based dialogs
