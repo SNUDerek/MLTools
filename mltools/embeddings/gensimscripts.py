@@ -1,8 +1,6 @@
 import codecs
 import json
-import numpy as np
 from gensim.models import Word2Vec
-from keras.layers import Embedding
 
 # tokenizing function
 def tokenize(sentence):
@@ -45,10 +43,3 @@ def load_vocab(vocab_path='temp_embeddings/mapping.json'):
     word2idx = data
     idx2word = dict([(v, k) for k, v in data.items()])
     return word2idx, idx2word
-
-
-# embedding layer function
-def word2vec_embedding_layer(embeddings_path='temp_embeddings/embeddings.npz'):
-    weights = np.load(open(embeddings_path, 'rb'))
-    layer = Embedding(input_dim=weights.shape[0], output_dim=weights.shape[1], weights=[weights])
-    return layer

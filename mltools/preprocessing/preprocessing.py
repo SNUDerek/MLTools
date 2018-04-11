@@ -1,6 +1,4 @@
-import codecs, re, random
 from collections import Counter
-from mlxtend.preprocessing import one_hot
 import numpy as np
 
 # function to get vocab, maxvocab
@@ -50,12 +48,16 @@ def index_sents(sent_tokens, vocab_dict, reverse=False, unk_name='UNK', verbose=
 
 # one-hot vectorizes a list of indexed vectors
 # takes matrix : list of lists (indexed-vectorized sents)
-# takes num : number of total classes (length of one-hot arrays)
+# takes classnum : number of total classes (length of one-hot arrays)
 # returns one-hot array matrix
-def onehot_vectorize(matrix, num):
+def onehot_vectorize(matrix, classnum=None):
     result = []
+    if classnum is None:
+        classnum = np.max(matrix)+1
+    else:
+        assert classnum >= np.max(matrix)
     for vector in matrix:
-        a = one_hot(vector.tolist(), dtype='int', num_labels=num)
+        a = np.eye(classnum)[vector]
         result.append(a)
     return np.array(result)
 
@@ -76,15 +78,23 @@ def decode_sequence(indexed_list, inv_vocab_dict):
 # keras code
 # https://github.com/fchollet/keras/issues/2708
 # https://github.com/fchollet/keras/issues/1627
-def dataGenerator(X, y, vocabsize, batch_size, epochsize):
+def dataGenerator(X, y, batch_size, epochsize, onehot=False, vocabsize=None):
 
     i = 0
+    shuffle_idx = np.random.permutation([i for i in range(y)])
 
     while True:
-        y_batch = onehot_vectorize(y[i:i + batch_size], vocabsize)
+        if onehot:
+            if vocabsize is None:
+                y_batch = onehot_vectorize(y[shuffle_idx[i:i + batch_size]], np.max(y))
+            else:
+                y_batch = onehot_vectorize(y[shuffle_idx[i:i + batch_size]], vocabsize)
+        else:
+            y_batch = y[shuffle_idx[i:i + batch_size]][:, :, np.newaxis]
         yield (X[i:i + batch_size], y_batch)
         if i + batch_size >= epochsize:
             i = 0
+            shuffle_idx = np.random.permutation([i for i in range(y)])
         else:
             i += batch_size
 

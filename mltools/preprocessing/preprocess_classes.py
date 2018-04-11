@@ -1,7 +1,6 @@
 import numpy as np
 import re
 from collections import Counter
-from keras.preprocessing.sequence import pad_sequences
 from sklearn.base import BaseEstimator, TransformerMixin
 
 class LabelIndexer:
@@ -265,6 +264,8 @@ class Indexer(BaseEstimator, TransformerMixin):
 
     Arguments
     ---------
+    dtype : str
+        Type of array data (default = int).
     max_len : int
         Maximum sequence length. If None, set = max length in data.
     pad : str
@@ -277,7 +278,9 @@ class Indexer(BaseEstimator, TransformerMixin):
         Symbol for unknown word (OOV word).
     pad_name : str
         Symbol for pad_value.
-
+    pad_value : int or float
+        Value of padding values (default = 0).
+        
     Attributes
     ----------
     idx2word : dict
@@ -287,7 +290,8 @@ class Indexer(BaseEstimator, TransformerMixin):
     """
 
     def __init__(self, max_len=None, pad='post', truncate='post',
-                 reverse=False, unk_name='UNK', pad_name='PAD',
+                 reverse=False, dtype='int32', pad_value=0,
+                 unk_name='UNK', pad_name='PAD',
                  word2idx=None, idx2word=None):
 
         super().__init__()
@@ -295,6 +299,8 @@ class Indexer(BaseEstimator, TransformerMixin):
         self.pad = pad
         self.truncate = truncate
         self.reverse = reverse
+        self.dtype = dtype
+        self.pad_value = pad_value
         self.unk_name = unk_name
         self.pad_name = pad_name
         self.word2idx = word2idx
@@ -306,6 +312,8 @@ class Indexer(BaseEstimator, TransformerMixin):
             state['pad'],
             state['truncate'],
             state['reverse'],
+            state['dtype'],
+            state['pad_value'],
             state['unk_name'],
             state['pad_name'],
             state['word2idx'],
@@ -318,6 +326,8 @@ class Indexer(BaseEstimator, TransformerMixin):
             'pad': self.pad,
             'truncate': self.truncate,
             'reverse': self.reverse,
+            'dtype': self.dtype,
+            'pad_value': self.pad_value,
             'unk_name': self.unk_name,
             'pad_name': self.pad_name,
             'word2idx': self.word2idx,
@@ -329,18 +339,52 @@ class Indexer(BaseEstimator, TransformerMixin):
     # pad integer-indexed sequences
     def _zero_pad(self, idx_tokens):
 
-        padded_data = pad_sequences(idx_tokens, maxlen=self.max_len, padding=self.pad, truncating=self.truncate)
+        if not hasattr(idx_tokens, '__len__'):
+            raise ValueError('tokenized data must be iterable.')
 
-        return padded_data
+        num_sents = len(idx_tokens)
+        sent_shape = tuple()
+        for sent in idx_tokens:
+            if len(sent) > 0:
+                sent_shape = np.asarray(sent).shape[1:]
+                break
+
+        data_matrix = (np.ones((num_sents, self.max_len) + sent_shape) * self.pad_value).astype(self.dtype)
+
+        for idx, sent in enumerate(idx_tokens):
+
+            if not len(sent):
+                continue
+
+            if self.truncate == 'pre':
+                trunc_sent = sent[-self.max_len:]
+            elif self.truncate == 'post':
+                trunc_sent = sent[:self.max_len]
+            else:
+                raise ValueError('bad truncating value/type "%s"' % self.truncate)
+
+            # check `trunc` has expected shape
+            trunc_sent = np.asarray(trunc_sent, dtype=self.dtype)
+            if trunc_sent.shape[1:] != sent_shape:
+                raise ValueError('shape of sent %s of sent at position %s is not expected shape %s' %
+                                 (trunc_sent.shape[1:], idx, sent_shape))
+
+            if self.pad == 'post':
+                data_matrix[idx, :len(trunc_sent)] = trunc_sent
+            elif self.pad == 'pre':
+                data_matrix[idx, -len(trunc_sent):] = trunc_sent
+            else:
+                raise ValueError('bad padding value/type "%s"' % self.pad)
+
+        return data_matrix
 
     # get vocabulary and construct dictionaries
     def _get_vocab(self, sent_toks):
 
         # get vocab list, cast all as strings
         vocab = [str(word) for sent in sent_toks for word in sent]
-        vocab_counts = [t for t in Counter(vocab).most_common()]  # get counts of each word, sort
-        vocab_counts = [t for t in vocab_counts if t[0] != self.unk_name]
-        sorted_vocab = [t[0] for t in vocab_counts]
+        # get counts of each word, sort
+        sorted_vocab = [t[0] for t in Counter(vocab).most_common()]
 
         # reserve for PAD and UNK
         sorted_vocab = sorted_vocab[:-2]
@@ -385,10 +429,9 @@ class Indexer(BaseEstimator, TransformerMixin):
     # fit model (vocab, max_len)
     def fit(self, sent_toks, y=None):
 
-        # set max_len if None
-        sent_lens = []
-
         if self.max_len is None:
+            # set max_len if None
+            sent_lens = [len(s) for s in sent_toks]
             self.max_len = np.max(sent_lens)
 
         # fit vocab
