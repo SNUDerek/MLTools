@@ -361,20 +361,19 @@ class Indexer(BaseEstimator, TransformerMixin):
             elif self.truncate == 'post':
                 trunc_sent = sent[:self.max_len]
             else:
-                raise ValueError('bad truncating value/type "%s"' % self.truncate)
+                raise ValueError('bad trunc type {}'.format(self.truncate))
 
             # check `trunc` has expected shape
             trunc_sent = np.asarray(trunc_sent, dtype=self.dtype)
             if trunc_sent.shape[1:] != sent_shape:
-                raise ValueError('shape of sent %s of sent at position %s is not expected shape %s' %
-                                 (trunc_sent.shape[1:], idx, sent_shape))
+                raise ValueError('bad shape of sent # {}'.format(idx))
 
             if self.pad == 'post':
                 data_matrix[idx, :len(trunc_sent)] = trunc_sent
             elif self.pad == 'pre':
                 data_matrix[idx, -len(trunc_sent):] = trunc_sent
             else:
-                raise ValueError('bad padding value/type "%s"' % self.pad)
+                raise ValueError('bad pad type {}'.format(self.pad))
 
         return data_matrix
 

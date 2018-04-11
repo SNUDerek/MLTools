@@ -1,5 +1,4 @@
 gensim
-mlxtend
 numpy
 sklearn
 scipy
