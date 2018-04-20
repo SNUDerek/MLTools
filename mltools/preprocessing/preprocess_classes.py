@@ -136,8 +136,6 @@ class Tokenizer(BaseEstimator, TransformerMixin):
     ---------
     lower : bool
         Convert all input strings to lowercase with .lower()
-    max_vocab : int
-        Maximum vocabulary by size
     min_count : int
         Minimum count for vocabulary (alternate size contraint)
     stopwords : list[str]
@@ -153,14 +151,14 @@ class Tokenizer(BaseEstimator, TransformerMixin):
         Vocabulary dictionary in form word : count
     """
 
-    def __init__(self, lower=True, max_vocab=10000, min_count=1,
+    def __init__(self, lower=True, min_count=1,
                  stopwords=[], regex=False, char=False, vcounts={},
                  unk_name='UNK'):
 
         super().__init__()
 
         self.lower = lower
-        self.max_vocab = max_vocab
+        # self.max_vocab = max_vocab
         self.min_count = min_count
         self.stopwords = stopwords
         self.regex = regex
@@ -171,7 +169,7 @@ class Tokenizer(BaseEstimator, TransformerMixin):
     def __setstate__(self, state):
         self.__init__(
             state['lower'],
-            state['max_vocab'],
+            # state['max_vocab'],
             state['min_count'],
             state['stopwords'],
             state['regex'],
@@ -182,7 +180,7 @@ class Tokenizer(BaseEstimator, TransformerMixin):
     def __getstate__(self):
         state = {
             'lower': self.lower,
-            'max_vocab': self.max_vocab,
+            # 'max_vocab': self.max_vocab,
             'min_count': self.min_count,
             'stopwords': self.stopwords,
             'regex': self.regex,
@@ -198,17 +196,15 @@ class Tokenizer(BaseEstimator, TransformerMixin):
 
         # get vocab list, cast all as strings
         vocab = [str(word) for sent in sent_toks for word in sent]
-        vocab_counts = [t for t in Counter(vocab).most_common()]
-        vocab_counts = [t for t in vocab_counts if t[0] not in self.stopwords and t[1] >= self.min_count]
+        vocab_counts = [t for t in sorted(Counter(vocab).most_common(), key=lambda x: x[1], reverse=True) if t[0] not in self.stopwords and t[1] >= self.min_count]
         self.vcounts = dict(vocab_counts)
 
         return
 
     # preprocess and space-tokenize
     def _tokenize(self, sentences, pretokenize=False):
-
+        
         results = []
-
         for sent in sentences:
             sent = str(sent).strip()
             if self.lower:
@@ -228,12 +224,12 @@ class Tokenizer(BaseEstimator, TransformerMixin):
                 results.append(sent_toks)
             else:
                 results.append([self.unk_name])
-
+                
         return results
 
     # fit function
     def fit(self, sentences, y=None):
-
+        
         tokens = self._tokenize(sentences, pretokenize=True)
         self._get_vocab(tokens)
 
@@ -267,6 +263,8 @@ class Indexer(BaseEstimator, TransformerMixin):
     ---------
     max_len : int
         Maximum sequence length. If None, set = max length in data.
+    max_vocab : int
+        Maximum vocabulary by size
     pad : str
         How to pad sequences ('pre' or 'post').
     truncate : str
@@ -286,12 +284,13 @@ class Indexer(BaseEstimator, TransformerMixin):
         Dictionary mapping words to integer indices.
     """
 
-    def __init__(self, max_len=None, pad='post', truncate='post',
+    def __init__(self, max_len=None, max_vocab=16000, pad='post', truncate='post',
                  reverse=False, unk_name='UNK', pad_name='PAD',
                  word2idx=None, idx2word=None):
 
         super().__init__()
         self.max_len = max_len
+        self.max_vocab = max_vocab
         self.pad = pad
         self.truncate = truncate
         self.reverse = reverse
@@ -303,6 +302,7 @@ class Indexer(BaseEstimator, TransformerMixin):
     def __setstate__(self, state):
         self.__init__(
             state['max_len'],
+            state['max_vocab'],
             state['pad'],
             state['truncate'],
             state['reverse'],
@@ -315,6 +315,7 @@ class Indexer(BaseEstimator, TransformerMixin):
     def __getstate__(self):
         state = {
             'max_len': self.max_len,
+            'max_vocab': self.max_vocab,
             'pad': self.pad,
             'truncate': self.truncate,
             'reverse': self.reverse,
@@ -338,15 +339,16 @@ class Indexer(BaseEstimator, TransformerMixin):
 
         # get vocab list, cast all as strings
         vocab = [str(word) for sent in sent_toks for word in sent]
-        vocab_counts = [t for t in Counter(vocab).most_common()]  # get counts of each word, sort
-        vocab_counts = [t for t in vocab_counts if t[0] != self.unk_name]
-        sorted_vocab = [t[0] for t in vocab_counts]
-
+        sorted_vocab = [t[0] for t in sorted(Counter(vocab).most_common(), key=lambda x: x[1], reverse=True)]
         # reserve for PAD and UNK
-        sorted_vocab = sorted_vocab[:-2]
+        if self.unk_name in sorted_vocab:
+            sorted_vocab = sorted_vocab[:self.max_vocab-1]
+        else:
+            sorted_vocab = sorted_vocab[:self.max_vocab-2]
         self.word2idx = {k: v + 1 for v, k in enumerate(sorted_vocab)}
-        self.word2idx[self.unk_name] = len(sorted_vocab) + 1
         self.word2idx[self.pad_name] = 0
+        if self.unk_name not in sorted_vocab:
+            self.word2idx[self.unk_name] = len(sorted_vocab) + 1
         self.idx2word = {v: k for k, v in self.word2idx.items()}
 
         return
@@ -375,7 +377,9 @@ class Indexer(BaseEstimator, TransformerMixin):
             if self.reverse:
                 sent = sent[::-1]
             for idx in sent:
-                if idx in self.idx2word.keys():
+                if self.idx2word[idx] == self.pad_name:
+                    pass
+                elif idx in self.idx2word.keys():
                     sent_toks.append(self.idx2word[idx])
                 else:  # out of max_vocab range or OOV
                     sent_toks.append(self.idx2word[self.unk_name])
